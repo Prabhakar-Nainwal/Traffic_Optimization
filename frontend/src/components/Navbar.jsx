@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Car, Settings, FileText} from 'lucide-react';
+import { Home, Car, FileText, ParkingCircle} from 'lucide-react';
 import myLogo from '../assets/logo.png';
 
 
@@ -37,7 +37,7 @@ const Navbar = ({ activeScreen, setActiveScreen }) => {
             activeScreen === 'zones' ? 'bg-blue-600' : 'hover:bg-gray-700'
           }`}
         >
-          <Settings size={20} className="mr-3" />
+          <ParkingCircle size={20} className="mr-3" />
           Parking Zones
         </button>
         
@@ -50,6 +50,8 @@ const Navbar = ({ activeScreen, setActiveScreen }) => {
           <FileText size={20} className="mr-3" />
           Logs & Reports
         </button>
+
+
       </nav>
     </div>
   );
