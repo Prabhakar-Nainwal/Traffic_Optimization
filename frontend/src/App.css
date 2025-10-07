@@ -1,0 +1,80 @@
+/* frontend/src/App.css */
+
+.container {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 30px 40px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+h1 {
+  color: #1a73e8;
+}
+
+.uploader {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+input[type="file"] {
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+button {
+  background-color: #1a73e8;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #1558b3;
+}
+
+button:disabled {
+  background-color: #9ac3f5;
+  cursor: not-allowed;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #1a73e8;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.results-container {
+  margin-top: 30px;
+}
+
+.results-container img {
+  max-width: 100%;
+  border-radius: 5px;
+  margin-top: 20px;
+  border: 1px solid #ddd;
+}
+
+.error {
+  color: red;
+  margin-top: 20px;
+}
