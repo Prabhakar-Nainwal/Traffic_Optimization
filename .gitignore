@@ -2,6 +2,8 @@
 # System files
 .DS_Store
 Thumbs.db
+# Trained Model
+anpr/weights/*.pt
 
 # Log files
 *.log
