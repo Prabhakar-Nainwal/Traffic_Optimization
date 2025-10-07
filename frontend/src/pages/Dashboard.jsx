@@ -6,41 +6,99 @@ import { subscribeToVehicles, subscribeToZones } from '../services/socket';
 import { vehicleAPI, zoneAPI } from '../services/api';
 
 const Dashboard = () => {
-  const [zones, setZones] = useState([
-    { id: 1, name: 'Zone A', total: 100, occupied: 65 },
-    { id: 2, name: 'Zone B', total: 80, occupied: 72 },
-    { id: 3, name: 'Zone C', total: 120, occupied: 45 }
-  ]);
-  
-  const [vehicles, setVehicles] = useState([
-    { id: 1, plate: 'UP16-AB-1234', fuel: 'Petrol', entryTime: '10:30 AM', decision: 'Allow' },
-    { id: 2, plate: 'DL08-CD-5678', fuel: 'Diesel', entryTime: '10:35 AM', decision: 'Warn' },
-    { id: 3, plate: 'MH12-EF-9012', fuel: 'EV', entryTime: '10:40 AM', decision: 'Allow' },
-    { id: 4, plate: 'KA03-GH-3456', fuel: 'Petrol', entryTime: '10:45 AM', decision: 'Allow' }
-  ]);
-
-  const fuelDistribution = [
+  const [zones, setZones] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [fuelDistribution, setFuelDistribution] = useState([
     { name: 'Petrol', value: 45, color: '#3b82f6' },
     { name: 'Diesel', value: 30, color: '#ef4444' },
     { name: 'EV', value: 25, color: '#10b981' }
-  ];
+  ]);
+  const [pollutionIndex, setPollutionIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const pollutionIndex = 68;
+  // Fetch parking zones
+  const fetchZones = async () => {
+    try {
+      const response = await zoneAPI.getAll();
+      if (response.success) {
+        setZones(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching zones:', error);
+    }
+  };
+
+  // Fetch recent vehicles
+  const fetchRecentVehicles = async () => {
+    try {
+      const response = await vehicleAPI.getRecent(10);
+      if (response.success) {
+        setVehicles(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching vehicles:', error);
+    }
+  };
+
+  // Fetch analytics data
+  const fetchAnalytics = async () => {
+    try {
+      const response = await vehicleAPI.getAnalytics();
+      if (response.success) {
+        const { fuelDistribution, pollutionIndex } = response.data;
+        
+        // Transform fuel distribution for chart
+        if (fuelDistribution && fuelDistribution.length > 0) {
+          const colors = { Petrol: '#3b82f6', Diesel: '#ef4444', EV: '#10b981', CNG: '#f59e0b' };
+          const chartData = fuelDistribution.map(item => ({
+            name: item.fuel_type,
+            value: item.count,
+            color: colors[item.fuel_type] || '#6b7280'
+          }));
+          setFuelDistribution(chartData);
+        }
+        
+        setPollutionIndex(pollutionIndex || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    }
+  };
 
   useEffect(() => {
+    // Fetch initial data
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchZones(), fetchRecentVehicles(), fetchAnalytics()]);
+      setLoading(false);
+    };
+    
+    loadData();
+
     // Subscribe to real-time updates
-    subscribeToVehicles((newVehicle) => {
-      setVehicles(prev => [newVehicle, ...prev]);
+    const unsubscribeVehicles = subscribeToVehicles((newVehicle) => {
+      setVehicles(prev => [newVehicle, ...prev.slice(0, 9)]);
+      fetchAnalytics(); // Update pollution index
     });
 
-    subscribeToZones((updatedZone) => {
+    const unsubscribeZones = subscribeToZones((updatedZone) => {
       setZones(prev => prev.map(z => z.id === updatedZone.id ? updatedZone : z));
     });
 
-    // Fetch initial data
-    // fetchZones();
-    // fetchRecentVehicles();
+    // Cleanup subscriptions on unmount
+    return () => {
+      unsubscribeVehicles();
+      unsubscribeZones();
+    };
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-xl text-gray-600">Loading dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -4,23 +4,16 @@ const ParkingZone = require('../models/ParkingZone');
 // Get all vehicle logs with filters
 exports.getAllVehicles = async (req, res) => {
   try {
-    const { fuelType, decision, startDate, endDate, search } = req.query;
+    const filters = {
+      fuelType: req.query.fuelType,
+      decision: req.query.decision,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+      search: req.query.search,
+      limit: req.query.limit
+    };
     
-    let query = {};
-    
-    if (fuelType) query.fuelType = fuelType;
-    if (decision) query.decision = decision;
-    if (search) query.numberPlate = { $regex: search, $options: 'i' };
-    
-    if (startDate || endDate) {
-      query.entryTime = {};
-      if (startDate) query.entryTime.$gte = new Date(startDate);
-      if (endDate) query.entryTime.$lte = new Date(endDate);
-    }
-    
-    const vehicles = await VehicleLog.find(query)
-      .populate('parkingZone', 'name')
-      .sort({ entryTime: -1 });
+    const vehicles = await VehicleLog.findAll(filters);
     
     res.json({
       success: true,
@@ -28,6 +21,7 @@ exports.getAllVehicles = async (req, res) => {
       data: vehicles
     });
   } catch (error) {
+    console.error('Error fetching vehicles:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching vehicle logs',
@@ -40,17 +34,14 @@ exports.getAllVehicles = async (req, res) => {
 exports.getRecentVehicles = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
-    
-    const vehicles = await VehicleLog.find()
-      .sort({ entryTime: -1 })
-      .limit(limit)
-      .populate('parkingZone', 'name');
+    const vehicles = await VehicleLog.findRecent(limit);
     
     res.json({
       success: true,
       data: vehicles
     });
   } catch (error) {
+    console.error('Error fetching recent vehicles:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching recent vehicles',
@@ -62,7 +53,15 @@ exports.getRecentVehicles = async (req, res) => {
 // Add new vehicle entry
 exports.addVehicle = async (req, res) => {
   try {
-    const { numberPlate, fuelType, decision, parkingZone } = req.body;
+    const { numberPlate, fuelType, decision, parkingZoneId } = req.body;
+    
+    // Validate required fields
+    if (!numberPlate || !fuelType || !decision) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: numberPlate, fuelType, decision'
+      });
+    }
     
     // Calculate pollution score based on fuel type
     const pollutionScores = {
@@ -74,20 +73,18 @@ exports.addVehicle = async (req, res) => {
     
     const pollutionScore = pollutionScores[fuelType] || 0;
     
+    // Create vehicle entry
     const vehicle = await VehicleLog.create({
       numberPlate,
       fuelType,
       decision,
-      parkingZone,
+      parkingZoneId,
       pollutionScore
     });
     
-    // Update parking zone occupancy
-    if (parkingZone && decision === 'Allow') {
-      await ParkingZone.findByIdAndUpdate(
-        parkingZone,
-        { $inc: { occupiedSlots: 1 } }
-      );
+    // Update parking zone occupancy if allowed
+    if (parkingZoneId && decision === 'Allow') {
+      await ParkingZone.incrementOccupancy(parkingZoneId);
     }
     
     // Emit real-time update via WebSocket
@@ -100,6 +97,7 @@ exports.addVehicle = async (req, res) => {
       data: vehicle
     });
   } catch (error) {
+    console.error('Error adding vehicle:', error);
     res.status(500).json({
       success: false,
       message: 'Error adding vehicle entry',
@@ -113,25 +111,22 @@ exports.updateVehicleExit = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const vehicle = await VehicleLog.findByIdAndUpdate(
-      id,
-      { exitTime: new Date() },
-      { new: true }
-    );
+    // Get vehicle details first
+    const vehicleBefore = await VehicleLog.findById(id);
     
-    if (!vehicle) {
+    if (!vehicleBefore) {
       return res.status(404).json({
         success: false,
         message: 'Vehicle not found'
       });
     }
     
+    // Update exit time
+    const vehicle = await VehicleLog.updateExit(id);
+    
     // Update parking zone occupancy
-    if (vehicle.parkingZone) {
-      await ParkingZone.findByIdAndUpdate(
-        vehicle.parkingZone,
-        { $inc: { occupiedSlots: -1 } }
-      );
+    if (vehicleBefore.parking_zone_id) {
+      await ParkingZone.decrementOccupancy(vehicleBefore.parking_zone_id);
     }
     
     // Emit real-time update
@@ -144,6 +139,7 @@ exports.updateVehicleExit = async (req, res) => {
       data: vehicle
     });
   } catch (error) {
+    console.error('Error updating vehicle exit:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating vehicle exit',
@@ -156,47 +152,13 @@ exports.updateVehicleExit = async (req, res) => {
 exports.getAnalytics = async (req, res) => {
   try {
     // Fuel type distribution
-    const fuelDistribution = await VehicleLog.aggregate([
-      {
-        $group: {
-          _id: '$fuelType',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    const fuelDistribution = await VehicleLog.getFuelDistribution();
     
     // Daily vehicle count for last 7 days
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    const dailyCount = await VehicleLog.aggregate([
-      {
-        $match: {
-          entryTime: { $gte: sevenDaysAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$entryTime' }
-          },
-          count: { $sum: 1 },
-          avgPollution: { $avg: '$pollutionScore' }
-        }
-      },
-      {
-        $sort: { _id: 1 }
-      }
-    ]);
+    const dailyCount = await VehicleLog.getDailyCounts();
     
     // Calculate current pollution index
-    const recentVehicles = await VehicleLog.find({
-      entryTime: { $gte: new Date(Date.now() - 3600000) } // Last hour
-    });
-    
-    const pollutionIndex = recentVehicles.length > 0
-      ? Math.round(recentVehicles.reduce((sum, v) => sum + v.pollutionScore, 0) / recentVehicles.length)
-      : 0;
+    const pollutionIndex = await VehicleLog.getPollutionIndex();
     
     res.json({
       success: true,
@@ -207,6 +169,7 @@ exports.getAnalytics = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Error fetching analytics:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching analytics',

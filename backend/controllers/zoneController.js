@@ -3,7 +3,7 @@ const ParkingZone = require('../models/ParkingZone');
 // Get all parking zones
 exports.getAllZones = async (req, res) => {
   try {
-    const zones = await ParkingZone.find({ isActive: true });
+    const zones = await ParkingZone.findAll();
     
     res.json({
       success: true,
@@ -11,6 +11,7 @@ exports.getAllZones = async (req, res) => {
       data: zones
     });
   } catch (error) {
+    console.error('Error fetching zones:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching parking zones',
@@ -36,6 +37,7 @@ exports.getZoneById = async (req, res) => {
       data: zone
     });
   } catch (error) {
+    console.error('Error fetching zone:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching parking zone',
@@ -49,11 +51,24 @@ exports.createZone = async (req, res) => {
   try {
     const { name, totalSlots, location } = req.body;
     
-    const zone = await ParkingZone.create({
-      name,
-      totalSlots,
-      location
-    });
+    // Validate required fields
+    if (!name || !totalSlots) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: name, totalSlots'
+      });
+    }
+    
+    // Check if zone already exists
+    const exists = await ParkingZone.exists(name);
+    if (exists) {
+      return res.status(400).json({
+        success: false,
+        message: 'A parking zone with this name already exists'
+      });
+    }
+    
+    const zone = await ParkingZone.create({ name, totalSlots, location });
     
     // Emit real-time update
     const io = req.app.get('io');
@@ -65,13 +80,7 @@ exports.createZone = async (req, res) => {
       data: zone
     });
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'A parking zone with this name already exists'
-      });
-    }
-    
+    console.error('Error creating zone:', error);
     res.status(500).json({
       success: false,
       message: 'Error creating parking zone',
@@ -85,11 +94,11 @@ exports.updateZone = async (req, res) => {
   try {
     const { name, totalSlots, location } = req.body;
     
-    const zone = await ParkingZone.findByIdAndUpdate(
-      req.params.id,
-      { name, totalSlots, location },
-      { new: true, runValidators: true }
-    );
+    const zone = await ParkingZone.update(req.params.id, {
+      name,
+      totalSlots,
+      location
+    });
     
     if (!zone) {
       return res.status(404).json({
@@ -108,6 +117,7 @@ exports.updateZone = async (req, res) => {
       data: zone
     });
   } catch (error) {
+    console.error('Error updating zone:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating parking zone',
@@ -119,18 +129,7 @@ exports.updateZone = async (req, res) => {
 // Delete parking zone (soft delete)
 exports.deleteZone = async (req, res) => {
   try {
-    const zone = await ParkingZone.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false },
-      { new: true }
-    );
-    
-    if (!zone) {
-      return res.status(404).json({
-        success: false,
-        message: 'Parking zone not found'
-      });
-    }
+    await ParkingZone.softDelete(req.params.id);
     
     // Emit real-time update
     const io = req.app.get('io');
@@ -141,6 +140,7 @@ exports.deleteZone = async (req, res) => {
       message: 'Parking zone deleted successfully'
     });
   } catch (error) {
+    console.error('Error deleting zone:', error);
     res.status(500).json({
       success: false,
       message: 'Error deleting parking zone',

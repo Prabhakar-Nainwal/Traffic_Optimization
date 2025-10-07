@@ -1,10 +1,10 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
 
+const db = require('./config/db');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const zoneRoutes = require('./routes/zoneRoutes');
 
@@ -13,7 +13,7 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: "http://localhost:3000",
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
   }
 });
 
@@ -21,10 +21,19 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-// MongoDB Connection
-const connectDB = require('./config/db');
-connectDB();
 
+// Test MySQL Connection using async/await
+const testDbConnection = async () => {
+  try {
+    await db.query('SELECT 1');
+    console.log('✅ MySQL Connected Successfully');
+  } catch (err) {
+    console.error('❌ MySQL Connection Error:', err);
+    process.exit(1); // Stop the server if DB connection fails
+  }
+};
+
+testDbConnection();
 
 // Routes
 app.use('/api/vehicles', vehicleRoutes);
@@ -32,15 +41,20 @@ app.use('/api/zones', zoneRoutes);
 
 // WebSocket for real-time updates
 io.on('connection', (socket) => {
-  console.log('🔌 New client connected');
+  console.log('🔌 New client connected:', socket.id);
   
   socket.on('disconnect', () => {
-    console.log('❌ Client disconnected');
+    console.log('❌ Client disconnected:', socket.id);
   });
 });
 
 // Make io accessible to routes
 app.set('io', io);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
+});
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
