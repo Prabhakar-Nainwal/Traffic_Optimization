@@ -7,6 +7,7 @@ require('dotenv').config();
 const db = require('./config/db');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const zoneRoutes = require('./routes/zoneRoutes');
+const incomingVehicleRoutes = require('./routes/incomingVehicleRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -21,23 +22,21 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-
-// Test MySQL Connection using async/await
-const testDbConnection = async () => {
+// Test MySQL Connection
+(async () => {
   try {
     await db.query('SELECT 1');
     console.log('✅ MySQL Connected Successfully');
   } catch (err) {
     console.error('❌ MySQL Connection Error:', err);
-    process.exit(1); // Stop the server if DB connection fails
+    process.exit(1);
   }
-};
-
-testDbConnection();
+})();
 
 // Routes
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/zones', zoneRoutes);
+app.use('/api/incoming', incomingVehicleRoutes);
 
 // WebSocket for real-time updates
 io.on('connection', (socket) => {

@@ -3,14 +3,19 @@ const db = require('../config/db');
 class ParkingZone {
   // Create new parking zone
   static async create(zoneData) {
-    const { name, totalSlots, location } = zoneData;
+    const { name, totalSlots, location, thresholdPercentage } = zoneData;
     
     const query = `
-      INSERT INTO parking_zones (name, total_slots, location)
-      VALUES (?, ?, ?)
+      INSERT INTO parking_zones (name, total_slots, location, threshold_percentage)
+      VALUES (?, ?, ?, ?)
     `;
     
-    const [result] = await db.execute(query, [name, totalSlots, location || '']);
+    const [result] = await db.execute(query, [
+      name, 
+      totalSlots, 
+      location || '', 
+      thresholdPercentage || 90
+    ]);
     
     return { id: result.insertId, ...zoneData, occupiedSlots: 0, isActive: true };
   }
@@ -24,6 +29,7 @@ class ParkingZone {
         total_slots as totalSlots,
         occupied_slots as occupiedSlots,
         location,
+        threshold_percentage as thresholdPercentage,
         is_active as isActive,
         (total_slots - occupied_slots) as availableSlots,
         ROUND((occupied_slots / total_slots) * 100) as occupancyPercentage,
@@ -47,6 +53,7 @@ class ParkingZone {
         total_slots as totalSlots,
         occupied_slots as occupiedSlots,
         location,
+        threshold_percentage as thresholdPercentage,
         is_active as isActive,
         (total_slots - occupied_slots) as availableSlots,
         ROUND((occupied_slots / total_slots) * 100) as occupancyPercentage,
@@ -60,17 +67,31 @@ class ParkingZone {
     return rows[0];
   }
 
+  // Check if occupancy is above threshold
+  static async checkOccupancy(id) {
+    const zone = await this.findById(id);
+    if (!zone) return null;
+    
+    const isAboveThreshold = zone.occupancyPercentage >= zone.thresholdPercentage;
+    
+    return {
+      ...zone,
+      isAboveThreshold,
+      decision: isAboveThreshold ? 'Warn' : 'Allow'
+    };
+  }
+
   // Update parking zone
   static async update(id, zoneData) {
-    const { name, totalSlots, location } = zoneData;
+    const { name, totalSlots, location, thresholdPercentage } = zoneData;
     
     const query = `
       UPDATE parking_zones
-      SET name = ?, total_slots = ?, location = ?
+      SET name = ?, total_slots = ?, location = ?, threshold_percentage = ?
       WHERE id = ?
     `;
     
-    await db.execute(query, [name, totalSlots, location || '', id]);
+    await db.execute(query, [name, totalSlots, location || '', thresholdPercentage || 90, id]);
     
     return await this.findById(id);
   }

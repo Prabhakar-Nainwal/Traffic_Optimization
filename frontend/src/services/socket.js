@@ -2,7 +2,6 @@ import { io } from 'socket.io-client';
 
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
 
-// Initialize socket connection
 const socket = io(SOCKET_URL, {
   transports: ['websocket', 'polling'],
   reconnection: true,
@@ -10,7 +9,6 @@ const socket = io(SOCKET_URL, {
   reconnectionAttempts: 5,
 });
 
-// Connection event handlers
 socket.on('connect', () => {
   console.log('✅ Connected to WebSocket server');
 });
@@ -23,28 +21,27 @@ socket.on('connect_error', (error) => {
   console.error('❌ WebSocket connection error:', error);
 });
 
-// Subscribe to new vehicle entries
-export const subscribeToVehicles = (callback) => {
-  socket.on('newVehicle', (vehicle) => {
-    console.log('🚗 New vehicle detected:', vehicle);
+// Subscribe to incoming vehicles
+export const subscribeToIncomingVehicles = (callback) => {
+  socket.on('newIncomingVehicle', (vehicle) => {
+    console.log('🚨 New incoming vehicle from ANPR:', vehicle);
     callback(vehicle);
   });
 
-  // Return unsubscribe function
   return () => {
-    socket.off('newVehicle');
+    socket.off('newIncomingVehicle');
   };
 };
 
-// Subscribe to vehicle exits
-export const subscribeToVehicleExits = (callback) => {
-  socket.on('vehicleExit', (vehicle) => {
-    console.log('🚗 Vehicle exited:', vehicle);
-    callback(vehicle);
+// Subscribe to processed vehicles
+export const subscribeToProcessedVehicles = (callback) => {
+  socket.on('vehicleProcessed', (data) => {
+    console.log('✅ Vehicle processed:', data);
+    callback(data);
   });
 
   return () => {
-    socket.off('vehicleExit');
+    socket.off('vehicleProcessed');
   };
 };
 
@@ -60,42 +57,16 @@ export const subscribeToZones = (callback) => {
   };
 };
 
-// Subscribe to zone creation
-export const subscribeToZoneCreation = (callback) => {
-  socket.on('zoneCreated', (zone) => {
-    console.log('🅿️ Zone created:', zone);
-    callback(zone);
+// Subscribe to vehicle exits
+export const subscribeToVehicleExits = (callback) => {
+  socket.on('vehicleExit', (vehicle) => {
+    console.log('🚗 Vehicle exited:', vehicle);
+    callback(vehicle);
   });
 
   return () => {
-    socket.off('zoneCreated');
+    socket.off('vehicleExit');
   };
-};
-
-// Subscribe to zone deletion
-export const subscribeToZoneDeletion = (callback) => {
-  socket.on('zoneDeleted', (data) => {
-    console.log('🅿️ Zone deleted:', data);
-    callback(data);
-  });
-
-  return () => {
-    socket.off('zoneDeleted');
-  };
-};
-
-// Disconnect socket
-export const disconnectSocket = () => {
-  if (socket.connected) {
-    socket.disconnect();
-  }
-};
-
-// Reconnect socket
-export const reconnectSocket = () => {
-  if (!socket.connected) {
-    socket.connect();
-  }
 };
 
 export default socket;

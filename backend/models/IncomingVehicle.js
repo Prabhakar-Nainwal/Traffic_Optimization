@@ -1,18 +1,21 @@
 const db = require('../config/db');
 
 class IncomingVehicle {
-  // Create new incoming vehicle entry (from ANPR)
+  // Create new incoming vehicle from ANPR
   static async create(vehicleData) {
-    const { numberPlate, fuelType, decision, parkingZoneId, pollutionScore } = vehicleData;
+    const { numberPlate, vehicleCategory, fuelType, confidence, decision, parkingZoneId, pollutionScore } = vehicleData;
     
     const query = `
-      INSERT INTO incoming_vehicles (number_plate, fuel_type, decision, parking_zone_id, pollution_score)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO incoming_vehicles 
+      (number_plate, vehicle_category, fuel_type, confidence, decision, parking_zone_id, pollution_score)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     
     const [result] = await db.execute(query, [
       numberPlate,
+      vehicleCategory,
       fuelType,
+      confidence,
       decision,
       parkingZoneId || null,
       pollutionScore || 0
@@ -22,7 +25,7 @@ class IncomingVehicle {
   }
 
   // Get all unprocessed incoming vehicles
-  static async findUnprocessed(limit = 10) {
+  static async findUnprocessed(limit = 50) {
     const query = `
       SELECT iv.*, p.name as zone_name 
       FROM incoming_vehicles iv
@@ -36,8 +39,8 @@ class IncomingVehicle {
     return rows;
   }
 
-  // Get all incoming vehicles (including processed)
-  static async findAll(limit = 50) {
+  // Get all incoming vehicles
+  static async findAll(limit = 100) {
     const query = `
       SELECT iv.*, p.name as zone_name 
       FROM incoming_vehicles iv
@@ -50,17 +53,16 @@ class IncomingVehicle {
     return rows;
   }
 
-  // Get incoming vehicle by ID
+  // Get by ID
   static async findById(id) {
     const query = 'SELECT * FROM incoming_vehicles WHERE id = ?';
     const [rows] = await db.execute(query, [id]);
     return rows[0];
   }
 
-  // Mark vehicle as processed and move to permanent logs
+  // Process vehicle (move to vehicle_logs if allowed)
   static async processVehicle(id) {
     try {
-      // Get incoming vehicle data
       const vehicle = await this.findById(id);
       
       if (!vehicle) {
@@ -73,76 +75,43 @@ class IncomingVehicle {
         [id]
       );
 
-      // Move to vehicle_logs (permanent storage)
-      const insertQuery = `
-        INSERT INTO vehicle_logs 
-        (number_plate, fuel_type, entry_time, decision, parking_zone_id, pollution_score)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `;
-      
-      const [result] = await db.execute(insertQuery, [
-        vehicle.number_plate,
-        vehicle.fuel_type,
-        vehicle.detected_time,
-        vehicle.decision,
-        vehicle.parking_zone_id,
-        vehicle.pollution_score
-      ]);
+      // Only move to vehicle_logs if decision is 'Allow'
+      if (vehicle.decision === 'Allow') {
+        const insertQuery = `
+          INSERT INTO vehicle_logs 
+          (number_plate, vehicle_category, fuel_type, confidence, entry_time, parking_zone_id, pollution_score)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        const [result] = await db.execute(insertQuery, [
+          vehicle.number_plate,
+          vehicle.vehicle_category,
+          vehicle.fuel_type,
+          vehicle.confidence,
+          vehicle.detected_time,
+          vehicle.parking_zone_id,
+          vehicle.pollution_score
+        ]);
 
-      return { 
-        success: true, 
-        vehicleLogId: result.insertId,
-        message: 'Vehicle processed and moved to permanent logs'
-      };
+        return { 
+          success: true, 
+          vehicleLogId: result.insertId,
+          message: 'Vehicle allowed and moved to permanent logs'
+        };
+      } else if (vehicle.decision === 'Warn') {
+        return {
+          success: true,
+          message: 'Vehicle warned - parking full'
+        };
+      } else {
+        return {
+          success: true,
+          message: 'Commercial vehicle - ignored'
+        };
+      }
     } catch (error) {
       throw error;
     }
-  }
-
-  // Batch process multiple vehicles
-  static async processMultiple(ids) {
-    const results = [];
-    
-    for (const id of ids) {
-      try {
-        const result = await this.processVehicle(id);
-        results.push({ id, ...result });
-      } catch (error) {
-        results.push({ id, success: false, error: error.message });
-      }
-    }
-    
-    return results;
-  }
-
-  // Auto-process old unprocessed vehicles (cleanup)
-  static async autoProcessOld(minutesOld = 30) {
-    const query = `
-      SELECT id FROM incoming_vehicles 
-      WHERE processed = FALSE 
-      AND detected_time < DATE_SUB(NOW(), INTERVAL ? MINUTE)
-    `;
-    
-    const [rows] = await db.execute(query, [minutesOld]);
-    const ids = rows.map(row => row.id);
-    
-    if (ids.length > 0) {
-      return await this.processMultiple(ids);
-    }
-    
-    return [];
-  }
-
-  // Delete old processed entries (cleanup)
-  static async deleteProcessed(daysOld = 7) {
-    const query = `
-      DELETE FROM incoming_vehicles 
-      WHERE processed = TRUE 
-      AND detected_time < DATE_SUB(NOW(), INTERVAL ? DAY)
-    `;
-    
-    const [result] = await db.execute(query, [daysOld]);
-    return result.affectedRows;
   }
 
   // Get statistics
@@ -152,6 +121,9 @@ class IncomingVehicle {
         COUNT(*) as total,
         SUM(CASE WHEN processed = FALSE THEN 1 ELSE 0 END) as unprocessed,
         SUM(CASE WHEN processed = TRUE THEN 1 ELSE 0 END) as processed,
+        SUM(CASE WHEN decision = 'Allow' THEN 1 ELSE 0 END) as allowed,
+        SUM(CASE WHEN decision = 'Warn' THEN 1 ELSE 0 END) as warned,
+        SUM(CASE WHEN decision = 'Ignore' THEN 1 ELSE 0 END) as ignored,
         AVG(pollution_score) as avg_pollution
       FROM incoming_vehicles
       WHERE detected_time >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
@@ -159,6 +131,18 @@ class IncomingVehicle {
     
     const [rows] = await db.execute(query);
     return rows[0];
+  }
+
+  // Delete old processed entries
+  static async deleteProcessed(daysOld = 7) {
+    const query = `
+      DELETE FROM incoming_vehicles 
+      WHERE processed = TRUE 
+      AND detected_time < DATE_SUB(NOW(), INTERVAL ? DAY)
+    `;
+    
+    const [result] = await db.execute(query, [daysOld]);
+    return result.affectedRows;
   }
 }
 

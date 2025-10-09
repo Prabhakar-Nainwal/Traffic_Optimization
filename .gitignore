@@ -18,7 +18,8 @@ npm-debug.log*
 
 # ### Project Specific ###
 # ANPR folder
-/anpr/venv/
+best.pt
+/anpr/best.pt
 /anpr/weights/
 
 # Frontend folder

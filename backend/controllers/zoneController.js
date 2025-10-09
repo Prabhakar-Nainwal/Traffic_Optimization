@@ -49,9 +49,8 @@ exports.getZoneById = async (req, res) => {
 // Create new parking zone
 exports.createZone = async (req, res) => {
   try {
-    const { name, totalSlots, location } = req.body;
+    const { name, totalSlots, location, thresholdPercentage } = req.body;
     
-    // Validate required fields
     if (!name || !totalSlots) {
       return res.status(400).json({
         success: false,
@@ -59,7 +58,6 @@ exports.createZone = async (req, res) => {
       });
     }
     
-    // Check if zone already exists
     const exists = await ParkingZone.exists(name);
     if (exists) {
       return res.status(400).json({
@@ -68,9 +66,8 @@ exports.createZone = async (req, res) => {
       });
     }
     
-    const zone = await ParkingZone.create({ name, totalSlots, location });
+    const zone = await ParkingZone.create({ name, totalSlots, location, thresholdPercentage });
     
-    // Emit real-time update
     const io = req.app.get('io');
     io.emit('zoneCreated', zone);
     
@@ -92,12 +89,13 @@ exports.createZone = async (req, res) => {
 // Update parking zone
 exports.updateZone = async (req, res) => {
   try {
-    const { name, totalSlots, location } = req.body;
+    const { name, totalSlots, location, thresholdPercentage } = req.body;
     
     const zone = await ParkingZone.update(req.params.id, {
       name,
       totalSlots,
-      location
+      location,
+      thresholdPercentage
     });
     
     if (!zone) {
@@ -107,7 +105,6 @@ exports.updateZone = async (req, res) => {
       });
     }
     
-    // Emit real-time update
     const io = req.app.get('io');
     io.emit('zoneUpdated', zone);
     
@@ -126,12 +123,11 @@ exports.updateZone = async (req, res) => {
   }
 };
 
-// Delete parking zone (soft delete)
+// Delete parking zone
 exports.deleteZone = async (req, res) => {
   try {
     await ParkingZone.softDelete(req.params.id);
     
-    // Emit real-time update
     const io = req.app.get('io');
     io.emit('zoneDeleted', { id: req.params.id });
     

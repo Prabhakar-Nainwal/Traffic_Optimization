@@ -1,27 +1,6 @@
 const db = require('../config/db');
-
 class VehicleLog {
-  // Create new vehicle entry
-  static async create(vehicleData) {
-    const { numberPlate, fuelType, decision, parkingZoneId, pollutionScore } = vehicleData;
-    
-    const query = `
-      INSERT INTO vehicle_logs (number_plate, fuel_type, decision, parking_zone_id, pollution_score)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-    
-    const [result] = await db.execute(query, [
-      numberPlate,
-      fuelType,
-      decision,
-      parkingZoneId || null,
-      pollutionScore || 0
-    ]);
-    
-    return { id: result.insertId, ...vehicleData };
-  }
-
-  // Get all vehicles with filters
+  // Get all vehicle logs with filters
   static async findAll(filters = {}) {
     let query = `
       SELECT v.*, p.name as zone_name 
@@ -36,9 +15,9 @@ class VehicleLog {
       params.push(filters.fuelType);
     }
 
-    if (filters.decision) {
-      query += ' AND v.decision = ?';
-      params.push(filters.decision);
+    if (filters.vehicleCategory) {
+      query += ' AND v.vehicle_category = ?';
+      params.push(filters.vehicleCategory);
     }
 
     if (filters.search) {
@@ -124,16 +103,26 @@ class VehicleLog {
     return rows;
   }
 
-  // Get pollution index (average of last hour)
+  // Get pollution index (based on EV vs ICE ratio)
   static async getPollutionIndex() {
     const query = `
-      SELECT AVG(pollution_score) as pollution_index
+      SELECT 
+        SUM(CASE WHEN fuel_type = 'ICE' THEN 1 ELSE 0 END) as ice_count,
+        SUM(CASE WHEN fuel_type = 'EV' THEN 1 ELSE 0 END) as ev_count,
+        COUNT(*) as total
       FROM vehicle_logs
       WHERE entry_time >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
     `;
     
     const [rows] = await db.execute(query);
-    return Math.round(rows[0].pollution_index || 0);
+    const { ice_count, ev_count, total } = rows[0];
+    
+    if (total === 0) return 0;
+    
+    // Calculate pollution index: 0-100 scale
+    // 100% ICE = 100, 100% EV = 0
+    const pollutionIndex = Math.round((ice_count / total) * 100);
+    return pollutionIndex;
   }
 
   // Find by ID

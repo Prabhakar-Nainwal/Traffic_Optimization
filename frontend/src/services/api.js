@@ -2,7 +2,6 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-// Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
@@ -10,9 +9,8 @@ const apiClient = axios.create({
   },
 });
 
-// Vehicle API endpoints
+// Vehicle API endpoints (permanent logs)
 export const vehicleAPI = {
-  // Get all vehicles with optional filters
   getAll: async (filters = {}) => {
     try {
       const response = await apiClient.get('/vehicles', { params: filters });
@@ -23,20 +21,6 @@ export const vehicleAPI = {
     }
   },
 
-  // Get recent vehicles for live feed
-  getRecent: async (limit = 10) => {
-    try {
-      const response = await apiClient.get('/vehicles/recent', { 
-        params: { limit } 
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching recent vehicles:', error);
-      throw error;
-    }
-  },
-
-  // Get analytics data
   getAnalytics: async () => {
     try {
       const response = await apiClient.get('/vehicles/analytics');
@@ -47,18 +31,6 @@ export const vehicleAPI = {
     }
   },
 
-  // Add new vehicle entry
-  add: async (vehicleData) => {
-    try {
-      const response = await apiClient.post('/vehicles', vehicleData);
-      return response.data;
-    } catch (error) {
-      console.error('Error adding vehicle:', error);
-      throw error;
-    }
-  },
-
-  // Update vehicle exit
   updateExit: async (id) => {
     try {
       const response = await apiClient.put(`/vehicles/${id}/exit`);
@@ -72,7 +44,6 @@ export const vehicleAPI = {
 
 // Zone API endpoints
 export const zoneAPI = {
-  // Get all parking zones
   getAll: async () => {
     try {
       const response = await apiClient.get('/zones');
@@ -83,7 +54,6 @@ export const zoneAPI = {
     }
   },
 
-  // Get single zone by ID
   getById: async (id) => {
     try {
       const response = await apiClient.get(`/zones/${id}`);
@@ -94,7 +64,6 @@ export const zoneAPI = {
     }
   },
 
-  // Create new parking zone
   create: async (zoneData) => {
     try {
       const response = await apiClient.post('/zones', zoneData);
@@ -105,7 +74,6 @@ export const zoneAPI = {
     }
   },
 
-  // Update existing zone
   update: async (id, zoneData) => {
     try {
       const response = await apiClient.put(`/zones/${id}`, zoneData);
@@ -116,7 +84,6 @@ export const zoneAPI = {
     }
   },
 
-  // Delete zone (soft delete)
   delete: async (id) => {
     try {
       const response = await apiClient.delete(`/zones/${id}`);
@@ -128,5 +95,39 @@ export const zoneAPI = {
   },
 };
 
-export default apiClient;
+// Incoming Vehicle API endpoints
+export const incomingVehicleAPI = {
+  getUnprocessed: async (limit = 50) => {
+    try {
+      const response = await apiClient.get('/incoming/unprocessed', { 
+        params: { limit } 
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching incoming vehicles:', error);
+      throw error;
+    }
+  },
 
+  process: async (id) => {
+    try {
+      const response = await apiClient.post(`/incoming/${id}/process`);
+      return response.data;
+    } catch (error) {
+      console.error('Error processing vehicle:', error);
+      throw error;
+    }
+  },
+
+  getStats: async () => {
+    try {
+      const response = await apiClient.get('/incoming/stats');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      throw error;
+    }
+  },
+};
+
+export default apiClient;

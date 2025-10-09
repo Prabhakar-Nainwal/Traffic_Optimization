@@ -1,13 +1,12 @@
 import React from 'react';
-import { Home, Car, FileText, ParkingCircle} from 'lucide-react';
-import myLogo from '../assets/logo.png';
-
+import { Home, Car, Settings, FileText } from 'lucide-react';
 
 const Navbar = ({ activeScreen, setActiveScreen }) => {
   return (
     <div className="w-64 bg-gray-800 text-white flex flex-col">
       <div className="p-6 border-b border-gray-700">
-          <img src={myLogo} alt="VisionPark Logo" className="h-13 w-auto"  />
+        <h1 className="text-xl font-bold">Traffic Optimizer</h1>
+        <p className="text-xs text-gray-400 mt-1">ANPR Management System</p>
       </div>
       
       <nav className="flex-1 p-4">
@@ -28,7 +27,7 @@ const Navbar = ({ activeScreen, setActiveScreen }) => {
           }`}
         >
           <Car size={20} className="mr-3" />
-          Vehicles
+          Vehicle Logs
         </button>
         
         <button
@@ -37,7 +36,7 @@ const Navbar = ({ activeScreen, setActiveScreen }) => {
             activeScreen === 'zones' ? 'bg-blue-600' : 'hover:bg-gray-700'
           }`}
         >
-          <ParkingCircle size={20} className="mr-3" />
+          <Settings size={20} className="mr-3" />
           Parking Zones
         </button>
         
@@ -50,9 +49,14 @@ const Navbar = ({ activeScreen, setActiveScreen }) => {
           <FileText size={20} className="mr-3" />
           Logs & Reports
         </button>
-
-
       </nav>
+      
+      <div className="p-4 border-t border-gray-700">
+        <div className="text-xs text-gray-400">
+          <p>System Status: <span className="text-green-400">Online</span></p>
+          <p className="mt-1">ANPR: <span className="text-green-400">Active</span></p>
+        </div>
+      </div>
     </div>
   );
 };
