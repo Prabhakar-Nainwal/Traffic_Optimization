@@ -60,7 +60,7 @@ class IncomingVehicle {
     return rows[0];
   }
 
-  // Process vehicle (move to vehicle_logs if allowed)
+  // Process vehicle (move to vehicle_logs ONLY if decision = 'Allow')
   static async processVehicle(id) {
     try {
       const vehicle = await this.findById(id);
@@ -69,13 +69,14 @@ class IncomingVehicle {
         throw new Error('Vehicle not found');
       }
 
-      // Mark as processed
+      // Mark as processed in incoming_vehicles
       await db.execute(
         'UPDATE incoming_vehicles SET processed = TRUE WHERE id = ?',
         [id]
       );
 
-      // Only move to vehicle_logs if decision is 'Allow'
+      // CRITICAL: Only move to vehicle_logs if decision is 'Allow'
+      // Ignore and Warn decisions do NOT go to vehicle_logs
       if (vehicle.decision === 'Allow') {
         const insertQuery = `
           INSERT INTO vehicle_logs 
@@ -96,17 +97,17 @@ class IncomingVehicle {
         return { 
           success: true, 
           vehicleLogId: result.insertId,
-          message: 'Vehicle allowed and moved to permanent logs'
+          message: 'Vehicle allowed - Added to vehicle_logs'
         };
       } else if (vehicle.decision === 'Warn') {
         return {
           success: true,
-          message: 'Vehicle warned - parking full'
+          message: 'Vehicle warned - NOT added to vehicle_logs'
         };
-      } else {
+      } else if (vehicle.decision === 'Ignore') {
         return {
           success: true,
-          message: 'Commercial vehicle - ignored'
+          message: 'Vehicle ignored - NOT added to vehicle_logs'
         };
       }
     } catch (error) {

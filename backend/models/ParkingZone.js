@@ -81,6 +81,38 @@ class ParkingZone {
     };
   }
 
+  // Check total occupancy across ALL zones
+  static async checkTotalOccupancy() {
+    const query = `
+      SELECT 
+        SUM(total_slots) as total_slots,
+        SUM(occupied_slots) as occupied_slots,
+        AVG(threshold_percentage) as avg_threshold
+      FROM parking_zones
+      WHERE is_active = TRUE
+    `;
+    
+    const [rows] = await db.execute(query);
+    const { total_slots, occupied_slots, avg_threshold } = rows[0];
+    
+    if (!total_slots || total_slots === 0) {
+      return { decision: 'Warn', occupancyPercentage: 100, availableSlots: 0 };
+    }
+    
+    const occupancyPercentage = Math.round((occupied_slots / total_slots) * 100);
+    const availableSlots = total_slots - occupied_slots;
+    const threshold = avg_threshold || 90;
+    
+    return {
+      totalSlots: total_slots,
+      occupiedSlots: occupied_slots,
+      availableSlots: availableSlots,
+      occupancyPercentage: occupancyPercentage,
+      threshold: threshold,
+      decision: occupancyPercentage >= threshold ? 'Warn' : 'Allow'
+    };
+  }
+
   // Update parking zone
   static async update(id, zoneData) {
     const { name, totalSlots, location, thresholdPercentage } = zoneData;
@@ -125,6 +157,22 @@ class ParkingZone {
     
     await db.execute(query, [id]);
     return await this.findById(id);
+  }
+
+  // Assign to a zone with available space
+  static async findAvailableZone() {
+    const query = `
+      SELECT id, name, total_slots, occupied_slots, 
+             (total_slots - occupied_slots) as available_slots
+      FROM parking_zones
+      WHERE is_active = TRUE 
+      AND occupied_slots < total_slots
+      ORDER BY occupied_slots ASC
+      LIMIT 1
+    `;
+    
+    const [rows] = await db.execute(query);
+    return rows[0] || null;
   }
 
   // Check if zone exists

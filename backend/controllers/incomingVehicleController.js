@@ -38,7 +38,7 @@ exports.addIncomingVehicle = async (req, res) => {
     // Calculate pollution score
     const pollutionScore = fuelType === 'ICE' ? 80 : 0;
 
-    // IGNORE Commercial vehicles completely
+    // STEP 1: Check if Commercial vehicle - assign IGNORE decision
     if (vehicleCategory === 'Commercial') {
       const vehicle = await IncomingVehicle.create({
         numberPlate,
@@ -50,89 +50,149 @@ exports.addIncomingVehicle = async (req, res) => {
         pollutionScore
       });
 
-      // Mark as processed immediately
+      // Mark as processed (will NOT go to vehicle_logs due to Ignore decision)
       await IncomingVehicle.processVehicle(vehicle.id);
 
+      // Emit to real-time feed
       const io = req.app.get('io');
-      io.emit('newIncomingVehicle', { ...vehicle, autoProcessed: true });
+      io.emit('newIncomingVehicle', {
+        id: vehicle.id,
+        number_plate: numberPlate,
+        vehicle_category: vehicleCategory,
+        fuel_type: fuelType,
+        confidence: confidence,
+        detected_time: new Date().toISOString(),
+        decision: 'Ignore',
+        zone_name: null,
+        pollution_score: pollutionScore
+      });
 
       return res.status(201).json({
         success: true,
-        message: 'Commercial vehicle - Ignored (no parking needed)',
+        message: 'Commercial vehicle - Decision: Ignore',
         data: vehicle,
-        decision: 'Ignore',
-        autoProcessed: true
+        decision: 'Ignore'
       });
     }
 
-    // For Private vehicles - check parking occupancy
-    const parkingZoneId = 1; // Default to Zone A
+    // STEP 2: For Private vehicles - check total parking occupancy
+    const totalOccupancyStatus = await ParkingZone.checkTotalOccupancy();
     
-    const zoneStatus = await ParkingZone.checkOccupancy(parkingZoneId);
+    const decision = totalOccupancyStatus.decision; // 'Allow' or 'Warn'
     
-    if (!zoneStatus) {
-      return res.status(404).json({
-        success: false,
-        message: 'Parking zone not found'
-      });
-    }
+    let assignedZoneId = null;
+    let assignedZoneName = null;
+    
+    if (decision === 'Allow') {
+      // Find an available zone with space
+      const availableZone = await ParkingZone.findAvailableZone();
+      
+      if (availableZone) {
+        assignedZoneId = availableZone.id;
+        assignedZoneName = availableZone.name;
+      } else {
+        // No zones available - change to Warn
+        const warnVehicle = await IncomingVehicle.create({
+          numberPlate,
+          vehicleCategory,
+          fuelType,
+          confidence,
+          decision: 'Warn',
+          parkingZoneId: null,
+          pollutionScore
+        });
 
-    // Determine decision based on occupancy threshold
-    const decision = zoneStatus.decision; // 'Allow' or 'Warn'
+        // Mark as processed (will NOT go to vehicle_logs due to Warn decision)
+        await IncomingVehicle.processVehicle(warnVehicle.id);
+
+        const io = req.app.get('io');
+        io.emit('newIncomingVehicle', {
+          id: warnVehicle.id,
+          number_plate: numberPlate,
+          vehicle_category: vehicleCategory,
+          fuel_type: fuelType,
+          confidence: confidence,
+          detected_time: new Date().toISOString(),
+          decision: 'Warn',
+          zone_name: null,
+          pollution_score: pollutionScore
+        });
+
+        return res.status(201).json({
+          success: true,
+          message: 'Private vehicle - Decision: Warn (All zones full)',
+          data: warnVehicle,
+          decision: 'Warn',
+          totalOccupancy: totalOccupancyStatus
+        });
+      }
+    }
     
-    // Create incoming vehicle entry
+    // STEP 3: Create incoming vehicle entry
     const vehicle = await IncomingVehicle.create({
       numberPlate,
       vehicleCategory,
       fuelType,
       confidence,
       decision,
-      parkingZoneId,
+      parkingZoneId: assignedZoneId,
       pollutionScore
     });
 
-    // AUTOMATIC PROCESSING
+    // STEP 4: Process vehicle
     const processResult = await IncomingVehicle.processVehicle(vehicle.id);
     
-    if (decision === 'Allow' && processResult.vehicleLogId) {
-      // Update parking zone occupancy for allowed vehicles
-      await ParkingZone.incrementOccupancy(parkingZoneId);
+    if (decision === 'Allow' && assignedZoneId && processResult.vehicleLogId) {
+      // ONLY for Allow decision: Update parking zone and add to vehicle_logs
+      await ParkingZone.incrementOccupancy(assignedZoneId);
       
       const io = req.app.get('io');
-      io.emit('newIncomingVehicle', { ...vehicle, autoProcessed: true });
-      io.emit('zoneUpdated', await ParkingZone.findById(parkingZoneId));
+      io.emit('newIncomingVehicle', {
+        id: vehicle.id,
+        number_plate: numberPlate,
+        vehicle_category: vehicleCategory,
+        fuel_type: fuelType,
+        confidence: confidence,
+        detected_time: new Date().toISOString(),
+        decision: 'Allow',
+        zone_name: assignedZoneName,
+        parking_zone_id: assignedZoneId,
+        pollution_score: pollutionScore
+      });
+      io.emit('zoneUpdated', await ParkingZone.findById(assignedZoneId));
       
       return res.status(201).json({
         success: true,
-        message: 'Vehicle Allowed - Entry Granted',
+        message: `Private vehicle - Decision: Allow (Assigned to ${assignedZoneName})`,
         data: vehicle,
         decision: 'Allow',
-        zoneInfo: {
-          name: zoneStatus.name,
-          occupancy: zoneStatus.occupancyPercentage + 1,
-          threshold: zoneStatus.thresholdPercentage,
-          availableSlots: zoneStatus.availableSlots - 1
+        assignedZone: {
+          id: assignedZoneId,
+          name: assignedZoneName
         },
-        autoProcessed: true,
         vehicleLogId: processResult.vehicleLogId
       });
     } else {
-      // Decision is 'Warn' - parking full
+      // Decision is Warn - parking full
       const io = req.app.get('io');
-      io.emit('newIncomingVehicle', { ...vehicle, autoProcessed: true });
+      io.emit('newIncomingVehicle', {
+        id: vehicle.id,
+        number_plate: numberPlate,
+        vehicle_category: vehicleCategory,
+        fuel_type: fuelType,
+        confidence: confidence,
+        detected_time: new Date().toISOString(),
+        decision: 'Warn',
+        zone_name: null,
+        pollution_score: pollutionScore
+      });
       
       return res.status(201).json({
         success: true,
-        message: 'Vehicle Warned - Parking Full',
+        message: 'Private vehicle - Decision: Warn (All zones full)',
         data: vehicle,
         decision: 'Warn',
-        zoneInfo: {
-          name: zoneStatus.name,
-          occupancy: zoneStatus.occupancyPercentage,
-          threshold: zoneStatus.thresholdPercentage,
-          availableSlots: zoneStatus.availableSlots
-        },
-        autoProcessed: true
+        totalOccupancy: totalOccupancyStatus
       });
     }
   } catch (error) {

@@ -149,7 +149,6 @@ const VehicleManagement = () => {
           </div>
         </div>
       </div>
-
       {/* Vehicle Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">

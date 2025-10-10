@@ -1,4 +1,5 @@
 const db = require('../config/db');
+
 class VehicleLog {
   // Get all vehicle logs with filters
   static async findAll(filters = {}) {

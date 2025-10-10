@@ -24,10 +24,8 @@ const Dashboard = () => {
 
   const fetchIncomingVehicles = async () => {
     try {
-      const response = await incomingVehicleAPI.getUnprocessed(50);
-      if (response.success) {
-        setIncomingVehicles(response.data);
-      }
+      // Don't fetch on initial load - let WebSocket populate it
+      setIncomingVehicles([]);
     } catch (error) {
       console.error('Error fetching incoming vehicles:', error);
     }
@@ -58,21 +56,31 @@ const Dashboard = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchZones(), fetchIncomingVehicles(), fetchAnalytics()]);
+      await Promise.all([fetchZones(), fetchAnalytics()]);
       setLoading(false);
     };
     
     loadData();
 
+    // Subscribe to incoming vehicles from ANPR (real-time)
     const unsubscribeIncoming = subscribeToIncomingVehicles((newVehicle) => {
-      // Add to incoming vehicles list temporarily
-      setIncomingVehicles(prev => [newVehicle, ...prev].slice(0, 50));
+      console.log('New vehicle received:', newVehicle);
       
-      // Remove after 3 seconds (auto-processed)
-      setTimeout(() => {
-        setIncomingVehicles(prev => prev.filter(v => v.id !== newVehicle.id));
-      }, 3000);
+      // Add to incoming vehicles list immediately
+      setIncomingVehicles(prev => {
+        // Check if vehicle already exists
+        const exists = prev.some(v => v.id === newVehicle.id);
+        if (exists) return prev;
+        
+        // Add new vehicle to the beginning with timestamp
+        const vehicleWithTimestamp = {
+          ...newVehicle,
+          displayTime: new Date().getTime()
+        };
+        return [vehicleWithTimestamp, ...prev];
+      });
       
+      // Refresh analytics and zones
       fetchAnalytics();
       fetchZones();
     });
@@ -81,9 +89,22 @@ const Dashboard = () => {
       setZones(prev => prev.map(z => z.id === updatedZone.id ? updatedZone : z));
     });
 
+    // Auto-cleanup: Remove vehicles older than 15 seconds
+    const cleanupInterval = setInterval(() => {
+      const now = new Date().getTime();
+      setIncomingVehicles(prev => 
+        prev.filter(v => {
+          const displayTime = v.displayTime || new Date(v.detected_time).getTime();
+          const age = now - displayTime;
+          return age < 15000; // Keep only vehicles from last 15 seconds
+        })
+      );
+    }, 100); // Check every 100ms for smooth and accurate removal
+
     return () => {
       unsubscribeIncoming();
       unsubscribeZones();
+      clearInterval(cleanupInterval);
     };
   }, []);
 
@@ -212,7 +233,7 @@ const Dashboard = () => {
                       <td className="p-3 text-gray-600">{vehicle.confidence}%</td>
                       <td className="p-3 text-gray-600 text-xs">{formatTime(vehicle.detected_time)}</td>
                       <td className="p-3">
-                        {vehicle.vehicle_category === 'Commercial' ? (
+                        {vehicle.decision === 'Ignore' ? (
                           <span className="px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-600 flex items-center gap-1 w-fit">
                             🚫 Ignored
                           </span>
