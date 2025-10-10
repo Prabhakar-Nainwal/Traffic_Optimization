@@ -6,6 +6,7 @@ import { vehicleAPI, zoneAPI } from '../services/api';
 import ParkingCard from '../components/ParkingCard';
 import LiveFeed from '../components/LiveFeed';
 import PollutionMeter from '../components/PollutionMeter';
+import { Loader } from 'lucide-react';
 
 const Dashboard = () => {
   const [zones, setZones] = useState([]);
@@ -93,6 +94,7 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
+        <Loader size={48} className="text-gray-500 animate-spin" />
         <div className="text-xl text-gray-600">Loading dashboard...</div>
       </div>
     );

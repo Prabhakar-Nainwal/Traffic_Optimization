@@ -1,13 +1,14 @@
 import React from 'react';
 import { Home, Car, Settings, FileText } from 'lucide-react';
-import logo from '../assets/logo.png';
 
 const Navbar = ({ activeScreen, setActiveScreen }) => {
   return (
     <div className="w-64 bg-gray-800 text-white flex flex-col">
       <div className="p-6 border-b border-gray-700">
-        <img src={logo} alt="VisionPark" width={500} height={450}></img>
-        <p className="text-xs text-gray-400 mt-1 text-center" >Smart ANPR Parking</p>
+        <h1 className="text-2xl font-bold text-left">
+          <span className="text-white">Vision</span>
+          <span className="text-blue-400">Park</span>
+        </h1>
       </div>
       
       <nav className="flex-1 p-4">

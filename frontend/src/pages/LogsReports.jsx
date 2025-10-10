@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Loader } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { vehicleAPI } from '../services/api';
 import jsPDF from 'jspdf';
@@ -126,6 +126,7 @@ const LogsReports = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
+        <Loader size={48} className="text-gray-500 animate-spin" />
         <div className="text-xl text-gray-600">Loading reports...</div>
       </div>
     );

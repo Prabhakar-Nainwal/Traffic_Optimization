@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react'; // 1. Import useCallback
+import { Search, Download, Loader } from 'lucide-react'; // Using Loader2 as discussed
 import { vehicleAPI } from '../services/api';
 import { subscribeToVehicleExits, subscribeToProcessedVehicles } from '../services/socket';
 
@@ -11,9 +11,9 @@ const VehicleManagement = () => {
   const [loading, setLoading] = useState(true);
   const isInitialMount = useRef(true);
 
-  // This single function now handles all data fetching
-  const fetchVehicles = async () => {
-    // Only show the main loading screen on the very first load
+  // 2. Wrap fetchVehicles in useCallback
+  const fetchVehicles = useCallback(async () => {
+    // Only show loading on the initial mount
     if (isInitialMount.current) {
       setLoading(true);
     }
@@ -31,15 +31,13 @@ const VehicleManagement = () => {
     } catch (error) {
       console.error('Error fetching vehicles:', error);
     } finally {
-      // Always turn off the loading indicator when done
+      // setLoading(false) will be called regardless of success or error
       setLoading(false);
     }
-  };
+  }, [filterFuel, filterCategory, searchTerm]); // Dependencies for useCallback
 
   const handleExitVehicle = async (id) => {
     try {
-      // We don't need to manually refetch here anymore.
-      // The socket listener below will handle the UI update automatically.
       await vehicleAPI.updateExit(id);
     } catch (error) {
       console.error('Error updating exit:', error);
@@ -69,17 +67,12 @@ const VehicleManagement = () => {
     document.body.removeChild(link);
   };
 
-  // Effect for setting up WebSocket listeners (runs only once)
+  // Effect for setting up WebSocket listeners
   useEffect(() => {
-    // A new vehicle was allowed and added to logs, so we add it to the top of our list
-    const unsubscribeProcessed = subscribeToProcessedVehicles((newLog) => {
-      // We can just add the new vehicle to the state without a full refetch
-      // Note: This assumes the backend sends the full vehicle log object
-      // For simplicity, we will refetch to respect filters.
+    const unsubscribeProcessed = subscribeToProcessedVehicles(() => {
       fetchVehicles();
     });
 
-    // A vehicle's exit was recorded, so we update it in our list
     const unsubscribeExits = subscribeToVehicleExits((exitedVehicle) => {
       setVehicles(prevVehicles => 
         prevVehicles.map(v => 
@@ -92,25 +85,22 @@ const VehicleManagement = () => {
       unsubscribeProcessed();
       unsubscribeExits();
     };
-  }, []); // Empty array ensures this runs only once
+  }, [fetchVehicles]); // 3. Add fetchVehicles to the dependency array
 
-  // Effect for fetching data when filters or search term change
+  // Effect for initial load and debounced filtering
   useEffect(() => {
     if (isInitialMount.current) {
-      // For the very first render, fetch data immediately
       isInitialMount.current = false;
       fetchVehicles();
       return;
     }
 
-    // For all subsequent changes, wait 500ms before fetching
     const handler = setTimeout(() => {
       fetchVehicles();
     }, 500);
 
-    // Clear the timeout if the user types again quickly
     return () => clearTimeout(handler);
-  }, [searchTerm, filterFuel, filterCategory]);
+  }, [searchTerm, filterFuel, filterCategory, fetchVehicles]); // 3. Add fetchVehicles here too
 
   const formatTime = (timestamp) => {
     if (!timestamp) return '-';
@@ -124,15 +114,16 @@ const VehicleManagement = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-xl text-gray-600">Loading vehicles...</div>
+      <div className="flex flex-col items-center justify-center h-full">
+        <Loader size={48} className="text-gray-500 animate-spin" />
+        <p className="text-lg text-gray-600 mt-4">Loading vehicles...</p>
       </div>
     );
   }
 
   return (
+    // ... JSX remains the same
     <div className="space-y-6">
-      {/* Filters and Table JSX remains the same */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-800">Vehicle Management</h1>
         <button

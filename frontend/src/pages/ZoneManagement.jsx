@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader } from 'lucide-react';
 import { zoneAPI } from '../services/api';
 
 const ZoneManagement = () => {
@@ -94,6 +94,7 @@ const ZoneManagement = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
+        <Loader size={48} className="text-gray-500 animate-spin" />
         <div className="text-xl text-gray-600">Loading zones...</div>
       </div>
     );
