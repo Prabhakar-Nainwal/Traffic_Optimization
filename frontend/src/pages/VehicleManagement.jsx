@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Download } from 'lucide-react';
 import { vehicleAPI } from '../services/api';
+import { subscribeToVehicleExits, subscribeToProcessedVehicles } from '../services/socket';
 
 const VehicleManagement = () => {
   const [vehicles, setVehicles] = useState([]);
@@ -8,15 +9,20 @@ const VehicleManagement = () => {
   const [filterFuel, setFilterFuel] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [loading, setLoading] = useState(true);
+  const isInitialMount = useRef(true);
 
+  // This single function now handles all data fetching
   const fetchVehicles = async () => {
-    try {
+    // Only show the main loading screen on the very first load
+    if (isInitialMount.current) {
       setLoading(true);
-      const filters = {};
-      
-      if (filterFuel !== 'all') filters.fuelType = filterFuel;
-      if (filterCategory !== 'all') filters.vehicleCategory = filterCategory;
-      if (searchTerm) filters.search = searchTerm;
+    }
+    try {
+      const filters = {
+        fuelType: filterFuel !== 'all' ? filterFuel : undefined,
+        vehicleCategory: filterCategory !== 'all' ? filterCategory : undefined,
+        search: searchTerm || undefined,
+      };
       
       const response = await vehicleAPI.getAll(filters);
       if (response.success) {
@@ -25,14 +31,16 @@ const VehicleManagement = () => {
     } catch (error) {
       console.error('Error fetching vehicles:', error);
     } finally {
+      // Always turn off the loading indicator when done
       setLoading(false);
     }
   };
 
   const handleExitVehicle = async (id) => {
     try {
+      // We don't need to manually refetch here anymore.
+      // The socket listener below will handle the UI update automatically.
       await vehicleAPI.updateExit(id);
-      await fetchVehicles();
     } catch (error) {
       console.error('Error updating exit:', error);
       alert('Failed to record exit');
@@ -50,35 +58,63 @@ const VehicleManagement = () => {
       v.exit_time ? new Date(v.exit_time).toLocaleString() : 'Still Inside',
       v.zone_name || 'N/A'
     ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `vehicle_logs_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    const csvContent = [headers.join(','), ...rows.map(row => `"${row.join('","')}"`)].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `vehicle_logs_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
+  // Effect for setting up WebSocket listeners (runs only once)
   useEffect(() => {
-    fetchVehicles();
-  }, [filterFuel, filterCategory]);
+    // A new vehicle was allowed and added to logs, so we add it to the top of our list
+    const unsubscribeProcessed = subscribeToProcessedVehicles((newLog) => {
+      // We can just add the new vehicle to the state without a full refetch
+      // Note: This assumes the backend sends the full vehicle log object
+      // For simplicity, we will refetch to respect filters.
+      fetchVehicles();
+    });
 
+    // A vehicle's exit was recorded, so we update it in our list
+    const unsubscribeExits = subscribeToVehicleExits((exitedVehicle) => {
+      setVehicles(prevVehicles => 
+        prevVehicles.map(v => 
+          v.id === exitedVehicle.id ? exitedVehicle : v
+        )
+      );
+    });
+
+    return () => {
+      unsubscribeProcessed();
+      unsubscribeExits();
+    };
+  }, []); // Empty array ensures this runs only once
+
+  // Effect for fetching data when filters or search term change
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    if (isInitialMount.current) {
+      // For the very first render, fetch data immediately
+      isInitialMount.current = false;
+      fetchVehicles();
+      return;
+    }
+
+    // For all subsequent changes, wait 500ms before fetching
+    const handler = setTimeout(() => {
       fetchVehicles();
     }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+
+    // Clear the timeout if the user types again quickly
+    return () => clearTimeout(handler);
+  }, [searchTerm, filterFuel, filterCategory]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return '-';
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-US', { 
+    return new Date(timestamp).toLocaleString('en-US', { 
       month: 'short', 
       day: 'numeric', 
       hour: '2-digit', 
@@ -96,6 +132,7 @@ const VehicleManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Filters and Table JSX remains the same */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-800">Vehicle Management</h1>
         <button
@@ -107,7 +144,6 @@ const VehicleManagement = () => {
         </button>
       </div>
       
-      {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-md">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -149,7 +185,7 @@ const VehicleManagement = () => {
           </div>
         </div>
       </div>
-      {/* Vehicle Table */}
+      
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">

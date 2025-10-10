@@ -54,15 +54,15 @@ def detect_plate_color(crop):
 
 def classify_vehicle(plate_color, text_color):
     if plate_color == "yellow":
-        return "commercial", "ICE"
+        return "Commercial", "ICE"
     elif plate_color == "white":
-        return "private", "ICE"
+        return "Private", "ICE"
     elif plate_color == "green":
         if text_color == "yellow":
-            return "commercial", "EV"
+            return "Commercial", "EV"
         else:
-            return "private", "EV"
-    return "unknown", "unknown"
+            return "Private", "EV"
+    return "Unknown", "Unknown"
 
 # --- Main Loop ---
 cap = cv2.VideoCapture(0)

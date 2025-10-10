@@ -3,7 +3,7 @@ import { Download } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { vehicleAPI } from '../services/api';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const LogsReports = () => {
   const [vehicles, setVehicles] = useState([]);
@@ -103,7 +103,7 @@ const LogsReports = () => {
       v.zone_name || 'N/A'
     ]);
     
-    doc.autoTable({
+    autoTable(doc, {
       head: [['Plate', 'Category', 'Fuel', 'Conf.', 'Entry', 'Exit', 'Zone']],
       body: tableData,
       startY: 55,
@@ -112,7 +112,8 @@ const LogsReports = () => {
     });
     
     if (vehicles.length > 50) {
-      doc.text(`Showing first 50 of ${vehicles.length} vehicles`, 14, doc.lastAutoTable.finalY + 10);
+      const finalY = doc.lastAutoTable.finalY;
+      doc.text(`Showing first 50 of ${vehicles.length} vehicles`, 14, finalY + 10);
     }
     
     doc.save(`traffic_report_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -207,7 +208,7 @@ const LogsReports = () => {
                   </td>
                 </tr>
               ) : (
-                vehicles.map(vehicle => (
+                vehicles.slice(0, 6).map(vehicle => ( // Display only the first 6 rows
                   <tr key={vehicle.id} className="border-b hover:bg-gray-50">
                     <td className="p-4 font-mono">{vehicle.number_plate}</td>
                     <td className="p-4">{vehicle.vehicle_category}</td>
