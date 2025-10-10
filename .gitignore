@@ -17,11 +17,6 @@ npm-debug.log*
 .env.*.local
 
 # ### Project Specific ###
-# ANPR folder
-best.pt
-/anpr/best.pt
-/anpr/weights/
-
 # Frontend folder
 /frontend/node_modules/
 /frontend/build/
