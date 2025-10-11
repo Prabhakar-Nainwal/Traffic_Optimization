@@ -22,30 +22,13 @@ The project consists of three core services:
 
 Here is a glimpse of the main application interfaces.
 
-*Note: You will need to place the image files in your repository and ensure the paths below are correct.*
+| Main Dashboard | Vehicle Logs Management |
+| :---: | :---: |
+| <img src="./Screenshots/dashboard.png" alt="Main Dashboard" width="400"/> | <img src="./Screenshots/VehicleManagement.png" alt="Vehicle Logs Management" width="400"/> |
 
-\<table\>
-\<tr\>
-\<td align="center"\>
-\<img src="./Screenshots/dashboard.png" alt="Main Dashboard" width="400"\>
-\<p\>\<b\>Main Dashboard\</b\>\</p\>
-\</td\>
-\<td align="center"\>
-\<img src="./Screenshots/VehicleManagement.png" alt="Vehicle Logs Management" width="400"\>
-\<p\>\<b\>Vehicle Logs Management\</b\>\</p\>
-\</td\>
-\</tr\>
-\<tr\>
-\<td align="center"\>
-\<img src="./Screenshots/ParkingZones.png" alt="Parking Zone Management" width="400"\>
-\<p\>\<b\>Parking Zone Management\</b\>\</p\>
-\</td\>
-\<td align="center"\>
-\<img src="./Screenshots/Logs_and_Reports.png" alt="Logs & Reports" width="400"\>
-\<p\>\<b\>Logs & Reports\</b\>\</p\>
-\</td\>
-\</tr\>
-\</table\>
+| Parking Zone Management | Logs & Reports |
+| :---: | :---: |
+| <img src="./Screenshots/ParkingZones.png" alt="Parking Zone Management" width="400"/> | <img src="./Screenshots/Logs_and_Reports.png" alt="Logs & Reports" width="400"/> |
 
 ## Tech Stack
 
