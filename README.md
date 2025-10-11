@@ -27,21 +27,21 @@ Here is a glimpse of the main application interfaces.
 \<table\>
 \<tr\>
 \<td align="center"\>
-\<img src="./dashboard.png" alt="Main Dashboard" width="400"\>
+\<img src="./Screenshots/dashboard.png" alt="Main Dashboard" width="400"\>
 \<p\>\<b\>Main Dashboard\</b\>\</p\>
 \</td\>
 \<td align="center"\>
-\<img src="./VehicleManagement.png" alt="Vehicle Logs Management" width="400"\>
+\<img src="./Screenshots/VehicleManagement.png" alt="Vehicle Logs Management" width="400"\>
 \<p\>\<b\>Vehicle Logs Management\</b\>\</p\>
 \</td\>
 \</tr\>
 \<tr\>
 \<td align="center"\>
-\<img src="./ParkingZones.png" alt="Parking Zone Management" width="400"\>
+\<img src="./Screenshots/ParkingZones.png" alt="Parking Zone Management" width="400"\>
 \<p\>\<b\>Parking Zone Management\</b\>\</p\>
 \</td\>
 \<td align="center"\>
-\<img src="./Logs\_and\_Reports.png" alt="Logs & Reports" width="400"\>
+\<img src="./Screenshots/Logs_and_Reports.png" alt="Logs & Reports" width="400"\>
 \<p\>\<b\>Logs & Reports\</b\>\</p\>
 \</td\>
 \</tr\>
