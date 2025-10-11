@@ -18,6 +18,35 @@ The project consists of three core services:
   * **Data Analytics & Reporting**: View historical data trends for daily traffic volume and pollution scores. Export comprehensive vehicle logs to CSV or PDF formats.
   * **Real-Time Updates**: Leverages WebSockets to ensure the UI reflects changes instantly without needing to refresh the page.
 
+## Application Preview
+
+Here is a glimpse of the main application interfaces.
+
+*Note: You will need to place the image files in your repository and ensure the paths below are correct.*
+
+\<table\>
+\<tr\>
+\<td align="center"\>
+\<img src="./dashboard.png" alt="Main Dashboard" width="400"\>
+\<p\>\<b\>Main Dashboard\</b\>\</p\>
+\</td\>
+\<td align="center"\>
+\<img src="./VehicleManagement.png" alt="Vehicle Logs Management" width="400"\>
+\<p\>\<b\>Vehicle Logs Management\</b\>\</p\>
+\</td\>
+\</tr\>
+\<tr\>
+\<td align="center"\>
+\<img src="./ParkingZones.png" alt="Parking Zone Management" width="400"\>
+\<p\>\<b\>Parking Zone Management\</b\>\</p\>
+\</td\>
+\<td align="center"\>
+\<img src="./Logs\_and\_Reports.png" alt="Logs & Reports" width="400"\>
+\<p\>\<b\>Logs & Reports\</b\>\</p\>
+\</td\>
+\</tr\>
+\</table\>
+
 ## Tech Stack
 
   * **ANPR Service**:
@@ -57,7 +86,6 @@ First, you need to create the database, tables, and a dedicated user.
     # Log in as a user with database creation privileges (e.g., root)
     mysql -u root -p < schema.sql
     ```
-
 
 ### 2\. Backend Setup
 
