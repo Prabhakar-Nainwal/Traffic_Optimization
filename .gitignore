@@ -31,6 +31,6 @@ __pycache__/
 ##OTHERS
 bfg.jar
 
-/anpr/ANPR-YOLOv8
+/anpr/YOLOv8/
+
 /anpr/venv
-/anpr/best.pt
