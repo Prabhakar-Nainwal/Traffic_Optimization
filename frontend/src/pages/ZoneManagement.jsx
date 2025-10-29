@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Loader } from 'lucide-react';
-import { zoneAPI } from '../services/api';
+import { zoneAPI } from '../services/api.js';
 
 const ZoneManagement = () => {
   const [zones, setZones] = useState([]);
@@ -120,52 +120,58 @@ const ZoneManagement = () => {
             No parking zones found. Create one to get started!
           </div>
         ) : (
-          zones.map(zone => (
-            <div key={zone.id} className="bg-white p-6 rounded-lg shadow-md">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800">{zone.name}</h3>
-                  <p className="text-sm text-gray-500">{zone.location}</p>
+          zones.map(zone => {
+            const isFull = zone.occupancyPercentage >= zone.thresholdPercentage;
+            const availabilityText = isFull ? 'Full' : `${zone.availableSlots} slots`;
+            const availabilityColor = isFull ? 'text-red-600' : 'text-green-600';
+
+            return (
+              <div key={zone.id} className="bg-white p-6 rounded-lg shadow-md">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800">{zone.name}</h3>
+                    <p className="text-sm text-gray-500">{zone.location}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEditingZone(zone)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteZone(zone.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setEditingZone(zone)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                  >
-                    <Edit size={18} />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteZone(zone.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total Capacity:</span>
+                    <span className="font-semibold">{zone.totalSlots} slots</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Current Occupancy:</span>
+                    <span className="font-semibold">{zone.occupiedSlots} / {zone.totalSlots}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Availability:</span>
+                    <span className={`font-semibold ${availabilityColor}`}>{availabilityText}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Occupancy:</span>
+                    <span className="font-semibold">{zone.occupancyPercentage}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Threshold:</span>
+                    <span className="font-semibold text-orange-600">{zone.thresholdPercentage}%</span>
+                  </div>
                 </div>
               </div>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Capacity:</span>
-                  <span className="font-semibold">{zone.totalSlots} slots</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Current Occupancy:</span>
-                  <span className="font-semibold">{zone.occupiedSlots} / {zone.totalSlots}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Availability:</span>
-                  <span className="font-semibold text-green-600">{zone.availableSlots} slots</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Occupancy:</span>
-                  <span className="font-semibold">{zone.occupancyPercentage}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Threshold:</span>
-                  <span className="font-semibold text-orange-600">{zone.thresholdPercentage}%</span>
-                </div>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -303,3 +309,4 @@ const ZoneManagement = () => {
 };
 
 export default ZoneManagement;
+

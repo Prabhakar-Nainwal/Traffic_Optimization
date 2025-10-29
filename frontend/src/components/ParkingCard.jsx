@@ -9,6 +9,10 @@ const ParkingCard = ({ zone }) => {
 
   const percentage = zone.occupancyPercentage;
   const threshold = zone.thresholdPercentage;
+  const isFull = percentage >= threshold;
+
+  const availabilityText = isFull ? 'Full' : `${zone.availableSlots} slots`;
+  const availabilityColor = isFull ? 'text-red-600' : 'text-green-600';
 
   return (
     <div
@@ -31,7 +35,11 @@ const ParkingCard = ({ zone }) => {
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Available:</span>
-          <span className="font-semibold text-green-600">{zone.availableSlots}</span>
+          <span className={`font-semibold ${availabilityColor}`}>{availabilityText}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600 font-bold">Threshold:</span>
+          <span className="font-semibold" >{zone.thresholdPercentage }%</span>
         </div>
 
         <div className="mt-3">

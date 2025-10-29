@@ -159,14 +159,14 @@ class ParkingZone {
     return await this.findById(id);
   }
 
-  // Assign to a zone with available space
+  // Assign to a zone with available space, considering the threshold
   static async findAvailableZone() {
     const query = `
       SELECT id, name, total_slots, occupied_slots, 
              (total_slots - occupied_slots) as available_slots
       FROM parking_zones
       WHERE is_active = TRUE 
-      AND occupied_slots < total_slots
+      AND ROUND((occupied_slots / total_slots) * 100) < threshold_percentage
       ORDER BY occupied_slots ASC
       LIMIT 1
     `;

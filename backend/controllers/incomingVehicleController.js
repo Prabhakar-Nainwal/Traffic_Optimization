@@ -7,7 +7,7 @@ exports.getUnprocessed = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const vehicles = await IncomingVehicle.findUnprocessed(limit);
     
-    res.json({
+   return res.json({
       success: true,
       count: vehicles.length,
       data: vehicles
@@ -26,7 +26,6 @@ exports.getUnprocessed = async (req, res) => {
 exports.addIncomingVehicle = async (req, res) => {
   try {
     const { numberPlate, vehicleCategory, fuelType, confidence } = req.body;
-    
     // Validate required fields
     if (!numberPlate || !vehicleCategory || !fuelType || confidence === undefined) {
       return res.status(400).json({
