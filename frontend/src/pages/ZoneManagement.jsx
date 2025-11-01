@@ -101,7 +101,7 @@ const ZoneManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="px-4 md:px-8 lg:px-10 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-800">Parking Zone Management</h1>
         <button
