@@ -40,6 +40,11 @@ export const vehicleAPI = {
       throw error;
     }
   },
+  getTrafficAnalytics: async (type) => {
+    const res = await fetch(`http://localhost:5000/api/vehicles/analytics/traffic?type=${type}`);
+    return await res.json();
+  }
+
 };
 
 // Zone API endpoints
@@ -99,8 +104,8 @@ export const zoneAPI = {
 export const incomingVehicleAPI = {
   getUnprocessed: async (limit = 50) => {
     try {
-      const response = await apiClient.get('/incoming/unprocessed', { 
-        params: { limit } 
+      const response = await apiClient.get('/incoming/unprocessed', {
+        params: { limit }
       });
       return response.data;
     } catch (error) {
@@ -129,5 +134,7 @@ export const incomingVehicleAPI = {
     }
   },
 };
+
+
 
 export default apiClient;

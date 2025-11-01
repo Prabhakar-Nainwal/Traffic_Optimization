@@ -1,51 +1,58 @@
 const db = require('../config/db');
 
 class VehicleLog {
-  // Get all vehicle logs with filters
-  static async findAll(filters = {}) {
-    let query = `
-      SELECT v.*, p.name as zone_name 
-      FROM vehicle_logs v
-      LEFT JOIN parking_zones p ON v.parking_zone_id = p.id
-      WHERE 1=1
-    `;
-    const params = [];
+  // Get all vehicle logs with filters and pagination
+static async findAll(filters = {}) {
+  let query = `
+    SELECT v.*, p.name as zone_name 
+    FROM vehicle_logs v
+    LEFT JOIN parking_zones p ON v.parking_zone_id = p.id
+    WHERE 1=1
+  `;
+  const params = [];
 
-    if (filters.fuelType) {
-      query += ' AND v.fuel_type = ?';
-      params.push(filters.fuelType);
-    }
-
-    if (filters.vehicleCategory) {
-      query += ' AND v.vehicle_category = ?';
-      params.push(filters.vehicleCategory);
-    }
-
-    if (filters.search) {
-      query += ' AND v.number_plate LIKE ?';
-      params.push(`%${filters.search}%`);
-    }
-
-    if (filters.startDate) {
-      query += ' AND v.entry_time >= ?';
-      params.push(filters.startDate);
-    }
-
-    if (filters.endDate) {
-      query += ' AND v.entry_time <= ?';
-      params.push(filters.endDate);
-    }
-
-    query += ' ORDER BY v.entry_time DESC';
-
-    if (filters.limit) {
-      query += ' LIMIT ?';
-      params.push(parseInt(filters.limit));
-    }
-
-    const [rows] = await db.execute(query, params);
-    return rows;
+  // Apply filters safely
+  if (filters.fuelType && filters.fuelType.trim() !== '') {
+    query += ' AND v.fuel_type = ?';
+    params.push(filters.fuelType.trim());
   }
+
+  if (filters.vehicleCategory && filters.vehicleCategory.trim() !== '') {
+    query += ' AND v.vehicle_category = ?';
+    params.push(filters.vehicleCategory.trim());
+  }
+
+  if (filters.search && filters.search.trim() !== '') {
+    query += ' AND v.number_plate LIKE ?';
+    params.push(`%${filters.search.trim()}%`);
+  }
+
+  if (filters.startDate && filters.startDate.trim() !== '') {
+    query += ' AND v.entry_time >= ?';
+    params.push(filters.startDate.trim());
+  }
+
+  if (filters.endDate && filters.endDate.trim() !== '') {
+    query += ' AND v.entry_time <= ?';
+    params.push(filters.endDate.trim());
+  }
+
+
+// Pagination section
+let limit = parseInt(filters.limit, 10);
+let offset = parseInt(filters.offset, 10);
+
+if (isNaN(limit) || limit <= 0) limit = 20;
+if (isNaN(offset) || offset < 0) offset = 0;
+
+query += ` ORDER BY v.entry_time DESC LIMIT ${limit} OFFSET ${offset}`;
+
+
+const [rows] = await db.execute(query, params);
+return rows;
+
+}
+
 
   // Get recent vehicles
   static async findRecent(limit = 10) {

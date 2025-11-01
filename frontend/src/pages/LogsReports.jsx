@@ -126,7 +126,7 @@ const LogsReports = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader size={48} className="text-gray-500 animate-spin" />
+        <Loader size={48} className="text-blue-600 animate-spin" />
         <div className="text-xl text-gray-600">Loading reports...</div>
       </div>
     );

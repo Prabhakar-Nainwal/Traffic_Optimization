@@ -126,8 +126,9 @@ class IncomingVehicle {
         SUM(CASE WHEN decision = 'Warn' THEN 1 ELSE 0 END) as warned,
         SUM(CASE WHEN decision = 'Ignore' THEN 1 ELSE 0 END) as ignored,
         AVG(pollution_score) as avg_pollution
+        
       FROM incoming_vehicles
-      WHERE detected_time >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+      WHERE detected_time >= DATE_SUB(NOW(), INTERVAL 1 DAY)
     `;
     
     const [rows] = await db.execute(query);

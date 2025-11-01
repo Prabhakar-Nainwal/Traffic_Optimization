@@ -38,6 +38,7 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/zones', zoneRoutes);
 app.use('/api/incoming', incomingVehicleRoutes);
 
+
 // WebSocket for real-time updates
 io.on('connection', (socket) => {
   console.log('🔌 New client connected:', socket.id);

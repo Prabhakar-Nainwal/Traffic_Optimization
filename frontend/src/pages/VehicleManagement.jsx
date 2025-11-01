@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'; // 1. Import useCallback
-import { Search, Download, Loader } from 'lucide-react'; // Using Loader2 as discussed
+import React, { useState, useEffect } from 'react';
+import { Search, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { vehicleAPI } from '../services/api';
-import { subscribeToVehicleExits, subscribeToProcessedVehicles } from '../services/socket';
 
 const VehicleManagement = () => {
   const [vehicles, setVehicles] = useState([]);
@@ -9,36 +8,57 @@ const VehicleManagement = () => {
   const [filterFuel, setFilterFuel] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [loading, setLoading] = useState(true);
-  const isInitialMount = useRef(true);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-  // 2. Wrap fetchVehicles in useCallback
-  const fetchVehicles = useCallback(async () => {
-    // Only show loading on the initial mount
-    if (isInitialMount.current) {
-      setLoading(true);
-    }
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  
+  const fetchVehicles = async (page = 1) => {
     try {
+      setLoading(true);
       const filters = {
-        fuelType: filterFuel !== 'all' ? filterFuel : undefined,
-        vehicleCategory: filterCategory !== 'all' ? filterCategory : undefined,
-        search: searchTerm || undefined,
+        page: page,
+        limit: itemsPerPage
       };
+      
+      if (filterFuel !== 'all') filters.fuelType = filterFuel;
+      if (filterCategory !== 'all') filters.vehicleCategory = filterCategory;
+      if (searchTerm) filters.search = searchTerm;
+      if (startDate) filters.startDate = startDate;
+      if (endDate) filters.endDate = endDate ;
       
       const response = await vehicleAPI.getAll(filters);
       if (response.success) {
         setVehicles(response.data);
+        
+        // Set pagination info if available from backend
+        if (response.pagination) {
+          setTotalItems(response.pagination.total);
+          setTotalPages(response.pagination.pages);
+          setCurrentPage(response.pagination.page);
+        } else {
+          // If no pagination from backend, calculate client-side
+          setTotalItems(response.count || response.data.length);
+          setTotalPages(Math.ceil((response.count || response.data.length) / itemsPerPage));
+        }
       }
     } catch (error) {
       console.error('Error fetching vehicles:', error);
     } finally {
-      // setLoading(false) will be called regardless of success or error
       setLoading(false);
     }
-  }, [filterFuel, filterCategory, searchTerm]); // Dependencies for useCallback
+  };
 
   const handleExitVehicle = async (id) => {
     try {
       await vehicleAPI.updateExit(id);
+      await fetchVehicles(currentPage);
     } catch (error) {
       console.error('Error updating exit:', error);
       alert('Failed to record exit');
@@ -56,55 +76,73 @@ const VehicleManagement = () => {
       v.exit_time ? new Date(v.exit_time).toLocaleString() : 'Still Inside',
       v.zone_name || 'N/A'
     ]);
-    const csvContent = [headers.join(','), ...rows.map(row => `"${row.join('","')}"`)].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `vehicle_logs_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vehicle_logs_page_${currentPage}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
-  // Effect for setting up WebSocket listeners
-  useEffect(() => {
-    const unsubscribeProcessed = subscribeToProcessedVehicles(() => {
-      fetchVehicles();
-    });
-
-    const unsubscribeExits = subscribeToVehicleExits((exitedVehicle) => {
-      setVehicles(prevVehicles => 
-        prevVehicles.map(v => 
-          v.id === exitedVehicle.id ? exitedVehicle : v
-        )
-      );
-    });
-
-    return () => {
-      unsubscribeProcessed();
-      unsubscribeExits();
-    };
-  }, [fetchVehicles]); // 3. Add fetchVehicles to the dependency array
-
-  // Effect for initial load and debounced filtering
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      fetchVehicles();
-      return;
+  // Pagination handlers
+  const goToFirstPage = () => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+      fetchVehicles(1);
     }
+  };
 
-    const handler = setTimeout(() => {
-      fetchVehicles();
-    }, 500);
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      const newPage = currentPage - 1;
+      setCurrentPage(newPage);
+      fetchVehicles(newPage);
+    }
+  };
 
-    return () => clearTimeout(handler);
-  }, [searchTerm, filterFuel, filterCategory, fetchVehicles]); // 3. Add fetchVehicles here too
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      const newPage = currentPage + 1;
+      setCurrentPage(newPage);
+      fetchVehicles(newPage);
+    }
+  };
+
+  const goToLastPage = () => {
+    if (currentPage !== totalPages) {
+      setCurrentPage(totalPages);
+      fetchVehicles(totalPages);
+    }
+  };
+
+  const goToPage = (pageNumber) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages && pageNumber !== currentPage) {
+      setCurrentPage(pageNumber);
+      fetchVehicles(pageNumber);
+    }
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+    fetchVehicles(1);
+  };
+
+useEffect(() => {
+  fetchVehicles(currentPage);
+}, [filterFuel, filterCategory, itemsPerPage, currentPage]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return '-';
-    return new Date(timestamp).toLocaleString('en-US', { 
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', { 
       month: 'short', 
       day: 'numeric', 
       hour: '2-digit', 
@@ -112,71 +150,169 @@ const VehicleManagement = () => {
     });
   };
 
-  if (loading) {
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
+  if (loading && currentPage === 1) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <Loader size={48} className="text-gray-500 animate-spin" />
-        <p className="text-lg text-gray-600 mt-4">Loading vehicles...</p>
+      <div className="flex items-center justify-center h-full">
+        <div className="text-xl text-gray-600">Loading vehicles...</div>
       </div>
     );
   }
 
   return (
-    // ... JSX remains the same
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">Vehicle Management</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">Vehicle Management</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Showing {vehicles.length > 0 ? ((currentPage - 1) * itemsPerPage + 1) : 0} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} vehicles
+          </p>
+        </div>
         <button
           onClick={exportToCSV}
           className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
         >
           <Download size={18} className="mr-2" />
-          Export CSV
+          Export Current Page
         </button>
       </div>
       
-      <div className="bg-white p-4 rounded-lg shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search Plate</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Enter number plate..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Fuel Type</label>
-            <select
-              value={filterFuel}
-              onChange={(e) => setFilterFuel(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Types</option>
-              <option value="EV">EV (Electric)</option>
-              <option value="ICE">ICE (Combustion)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Category</label>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Categories</option>
-              <option value="Private">Private</option>
-              <option value="Commercial">Commercial</option>
-            </select>
-          </div>
-        </div>
+      {/* Filters */}
+<div className="bg-white p-4 rounded-lg shadow-md">
+  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+    {/* Search Plate */}
+    <div className="md:col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-2">Search Plate</label>
+      <div className="relative">
+        <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+        <input
+          type="text"
+          placeholder="Enter number plate..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setCurrentPage(1);
+              fetchVehicles(1);
+            }
+          }}
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
       </div>
-      
+    </div>
+
+    {/* Fuel Type */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Fuel Type</label>
+      <select
+        value={filterFuel}
+        onChange={(e) => setFilterFuel(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      >
+        <option value="all">All Types</option>
+        <option value="EV">EV (Electric)</option>
+        <option value="ICE">ICE (Combustion)</option>
+      </select>
+    </div>
+
+    {/* Vehicle Category */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Category</label>
+      <select
+        value={filterCategory}
+        onChange={(e) => setFilterCategory(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      >
+        <option value="all">All Categories</option>
+        <option value="Private">Private</option>
+        <option value="Commercial">Commercial</option>
+      </select>
+    </div>
+
+    {/* Start Date */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+      <input
+        type="date"
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+
+    {/* End Date */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+      <input
+        type="date"
+        value={endDate}
+        onChange={(e) => setEndDate(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+  </div>
+
+  {/* Apply / Clear Buttons */}
+  <div className="flex justify-end mt-4 space-x-3">
+    <button
+      onClick={() => {
+        setCurrentPage(1);
+        fetchVehicles(1);
+      }}
+      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+    >
+      Apply Filters
+    </button>
+    <button
+      onClick={() => {
+        setStartDate('');
+        setEndDate('');
+        setFilterFuel('all');
+        setFilterCategory('all');
+        setSearchTerm('');
+        setCurrentPage(1);
+        fetchVehicles(1);
+      }}
+      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+    >
+      Clear
+    </button>
+  </div>
+</div>
+
+
+      {/* Vehicle Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -193,7 +329,16 @@ const VehicleManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {vehicles.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="p-8 text-center text-gray-500">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-3">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : vehicles.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="p-8 text-center text-gray-500">
                     No vehicles found
@@ -245,6 +390,117 @@ const VehicleManagement = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {!loading && totalPages > 1 && (
+          <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              {/* Left: Items info */}
+              <div className="text-sm text-gray-700">
+                Page <span className="font-semibold">{currentPage}</span> of{' '}
+                <span className="font-semibold">{totalPages}</span>
+              </div>
+
+              {/* Center: Page numbers */}
+              <div className="flex items-center space-x-2">
+                {/* First Page */}
+                <button
+                  onClick={goToFirstPage}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded ${
+                    currentPage === 1
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="First Page"
+                >
+                  <ChevronsLeft size={20} />
+                </button>
+
+                {/* Previous Page */}
+                <button
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded ${
+                    currentPage === 1
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Previous Page"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+
+                {/* Page Numbers */}
+                {getPageNumbers().map((page, index) => (
+                  page === '...' ? (
+                    <span key={`ellipsis-${index}`} className="px-3 py-1 text-gray-500">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-1 rounded ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white font-semibold'
+                          : 'text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                ))}
+
+                {/* Next Page */}
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded ${
+                    currentPage === totalPages
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Next Page"
+                >
+                  <ChevronRight size={20} />
+                </button>
+
+                {/* Last Page */}
+                <button
+                  onClick={goToLastPage}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded ${
+                    currentPage === totalPages
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Last Page"
+                >
+                  <ChevronsRight size={20} />
+                </button>
+              </div>
+
+              {/* Right: Quick jump */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-700">Go to:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  value={currentPage}
+                  onChange={(e) => {
+                    const page = parseInt(e.target.value);
+                    if (page >= 1 && page <= totalPages) {
+                      goToPage(page);
+                    }
+                  }}
+                  className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
