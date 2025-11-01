@@ -28,7 +28,7 @@ Here is a glimpse of the main application interfaces.
 
 | Logs & Reports | Insights |
 | :---: | :---: |
-| <img src="./Screenshots/Logs_and_Reports.png" alt="Logs & Reports" width="400"/> | <img src="./Screenshots/insights.png" alt="Insights" width="400"/> |
+| <img src="./Screenshots/Logs_and_Reports.png" alt="Logs & Reports" width="400"/> | <img src="./Screenshots/Insights.png" alt="Insights" width="400"/> |
 
 ## Tech Stack
 
