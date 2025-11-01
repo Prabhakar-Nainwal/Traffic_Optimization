@@ -6,7 +6,7 @@ const vehicleController = require('../controllers/vehicleController'); //Traffic
 router.get('/', vehicleController.getAllVehicles);
 router.get('/analytics', vehicleController.getAnalytics);
 router.put('/:id/exit', vehicleController.updateVehicleExit);
-router.get('/analytics/traffic', vehicleController.getTrafficAnalytics);  //Traffic Analysis
+router.get('/analytics/traffic', vehicleController.getTrafficAnalytics); //TrafficAnalysis
 
 module.exports = router;
 

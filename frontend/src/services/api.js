@@ -43,7 +43,17 @@ export const vehicleAPI = {
   getTrafficAnalytics: async (type) => {
     const res = await fetch(`http://localhost:5000/api/vehicles/analytics/traffic?type=${type}`);
     return await res.json();
-  }
+  },
+
+    getUserInsights: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/vehicles/analytics/insights', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user insights:', error);
+      throw error;
+    }
+  },
 
 };
 
@@ -133,8 +143,9 @@ export const incomingVehicleAPI = {
       throw error;
     }
   },
-};
 
+
+};
 
 
 export default apiClient;
